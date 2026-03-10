@@ -1,0 +1,8 @@
+boto3
+jupyter
+pyspark==3.5.1
+python-dotenv
+pandas
+pyarrow
+requests
+pynessie
