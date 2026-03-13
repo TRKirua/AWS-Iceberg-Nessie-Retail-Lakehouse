@@ -31,7 +31,8 @@ def get_spark(app_name: str = "aws-iceberg-nessie-retail-lakehouse") -> SparkSes
                 "org.projectnessie.nessie-integrations:nessie-spark-extensions-3.5_2.12:0.103.3",
                 "software.amazon.awssdk:bundle:2.25.53",
                 "software.amazon.awssdk:url-connection-client:2.25.53",
-                "org.apache.hadoop:hadoop-aws:3.3.4"
+                "org.apache.hadoop:hadoop-aws:3.3.4",
+                "com.databricks:spark-xml_2.12:0.18.0"
             ])
         )
         .config(
