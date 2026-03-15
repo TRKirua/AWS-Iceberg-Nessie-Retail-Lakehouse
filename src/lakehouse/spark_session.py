@@ -6,7 +6,6 @@ from lakehouse.settings import (
     AWS_ACCESS_KEY_ID,
     AWS_SECRET_ACCESS_KEY,
     NESSIE_URI,
-    NESSIE_BRANCH,
     WAREHOUSE,
 )
 
@@ -15,7 +14,7 @@ def get_spark(app_name: str = "aws-iceberg-nessie-retail-lakehouse") -> SparkSes
     Create and return a Spark session configured for:
     - AWS S3
     - Apache Iceberg
-    - Project Nessie
+    - Project Nessie (dynamic branching)
     """
 
     # Required on Windows for Spark/Hadoop
@@ -27,8 +26,8 @@ def get_spark(app_name: str = "aws-iceberg-nessie-retail-lakehouse") -> SparkSes
         .config(
             "spark.jars.packages",
             ",".join([
-                "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.7.1",
-                "org.projectnessie.nessie-integrations:nessie-spark-extensions-3.5_2.12:0.103.3",
+                "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.1",
+                "org.projectnessie.nessie-integrations:nessie-spark-extensions-3.5_2.12:0.104.5",
                 "software.amazon.awssdk:bundle:2.25.53",
                 "software.amazon.awssdk:url-connection-client:2.25.53",
                 "org.apache.hadoop:hadoop-aws:3.3.4",
@@ -43,10 +42,10 @@ def get_spark(app_name: str = "aws-iceberg-nessie-retail-lakehouse") -> SparkSes
         .config("spark.sql.catalog.nessie", "org.apache.iceberg.spark.SparkCatalog")
         .config("spark.sql.catalog.nessie.catalog-impl", "org.apache.iceberg.nessie.NessieCatalog")
         .config("spark.sql.catalog.nessie.uri", NESSIE_URI)
-        .config("spark.sql.catalog.nessie.ref", NESSIE_BRANCH)
         .config("spark.sql.catalog.nessie.warehouse", WAREHOUSE)
         .config("spark.sql.catalog.nessie.authentication.type", "NONE")
         .config("spark.sql.catalog.nessie.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
+        .config("spark.sql.catalog.nessie.client-api-version", "2")
         .config("spark.hadoop.fs.s3a.access.key", AWS_ACCESS_KEY_ID)
         .config("spark.hadoop.fs.s3a.secret.key", AWS_SECRET_ACCESS_KEY)
         .config("spark.hadoop.fs.s3a.endpoint.region", AWS_REGION)

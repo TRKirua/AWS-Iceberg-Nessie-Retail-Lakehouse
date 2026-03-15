@@ -165,11 +165,11 @@ def generate_summary_report(batches: list[Path], output_dir: Path) -> Path:
         f.write("- **Duplicates**: Duplicate order_id + product_id combinations (~1%)\n\n")
 
         f.write("## Expected Filtering Behavior\n\n")
-        f.write("| Layer | Expected Action |\n")
-        f.write("|-------|-----------------|\n")
-        f.write("| Bronze | Keep all records (append-only) |\n")
+        f.write("| Layer  | Expected Action                          |\n")
+        f.write("|--------|------------------------------------------|\n")
+        f.write("| Bronze | Keep all records (append-only)           |\n")
         f.write("| Silver | Filter nulls, duplicates, invalid values |\n")
-        f.write("| Gold | Aggregate clean Silver data |\n\n")
+        f.write("| Gold   | Aggregate clean Silver data              |\n\n")
 
         f.write("## Batch Files\n\n")
         for batch_path in batches:

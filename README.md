@@ -1,6 +1,6 @@
-# Versioned Retail Lakehouse on AWS with Apache Iceberg & Nessie
+# Retail Lakehouse on AWS with Apache Iceberg & Nessie
 
-A professional demonstration of a modern data lakehouse architecture using:
+A professional data lakehouse demonstration using:
 - **AWS S3** for object storage
 - **Apache Iceberg** for ACID table format with time travel
 - **Project Nessie** for Git-like data catalog versioning
@@ -10,63 +10,52 @@ A professional demonstration of a modern data lakehouse architecture using:
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           DATA LAKEHOUSE                                │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│   CSV Source ──► S3 Raw Zone ──► Bronze ──► Silver ──► Gold             │
-│                                 (Iceberg)  (Iceberg) (Iceberg)          │
-│                                     │          │         │              │
-│                                     ▼          ▼         ▼              │
-│                                   Nessie Catalog (Versioned)            │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                      DATA LAKEHOUSE                      │
+├──────────────────────────────────────────────────────────┤
+│                                                          │
+│   S3 Files ──► Bronze ──► Silver ──► Gold                │
+│               (Iceberg)  (Iceberg) (Iceberg)             │
+│                   │          │         │                 │
+│                   ▼          ▼         ▼                 │
+│                 Nessie Catalog (Versioned)               │
+│                                                          │
+└──────────────────────────────────────────────────────────┘
 ```
-
-### Layer Responsibilities
-
-| Layer      | Purpose             | Characteristics                                                       |
-|------------|---------------------|-----------------------------------------------------------------------|
-| **Bronze** | Raw data landing    | Append-only, partitioned by `ingestion_date`, preserves source format |
-| **Silver** | Standardization     | Column renaming, quality filters, deduplication, type casting         |
-| **Gold**   | Business aggregates | Pre-computed metrics, rounded values, reporting-ready                 |
 
 ## Project Structure
 
 ```
 aws-iceberg-nessie-retail-lakehouse/
-├── .github/
-│   └── workflows/
-│       └── data_pipeline.yml      # CI/CD pipeline validation
 ├── data/
-│   ├── raw/                       # Single source file
+│   ├── raw/                    # Single source file for initial load
 │   │   └── superstore_sales.csv
-│   └── raw_batches/               # Multi-batch generated files
-├── notebooks/                     # Jupyter notebooks for demo
+│   └── raw_batches/            # Multi-batch files for demo
+│       ├── sales_batch_1.csv
+│       ├── sales_batch_2.csv
+│       └── sales_batch_3.csv
+├── notebooks/                  # Jupyter notebooks for learning and demo
 │   ├── 01_setup_environment.ipynb
 │   ├── 02_ingestion_bronze.ipynb
 │   ├── 03_silver_transformations.ipynb
-│   └── 04_gold_layer.ipynb
-├── scripts/                       # Executable Python scripts
-│   ├── create_bronze_tables.py
-│   ├── create_silver_tables.py
-│   ├── create_gold_tables.py
-│   ├── run_full_pipeline.py
-│   ├── ingest_multi_batch.py
-│   ├── generate_batch_data.py
-│   └── upload_to_s3.py
-├── sql/                           # Useful query templates
+│   ├── 04_gold_layer.ipynb
+│   ├── 05_nessie_demo.ipynb
+│   └── 06_complete_demo.ipynb  # Multi-batch demo for interviews
+├── scripts/                    # Executable Python scripts
+│   ├── run_full_pipeline.py    # Main pipeline script
+│   ├── upload_to_s3.py         # Upload data to S3
+│   └── generate_batch_data.py  # Generate test batch files
+├── sql/                        # Query templates for each layer
 │   ├── bronze_queries.sql
 │   ├── silver_queries.sql
 │   ├── gold_queries.sql
 │   └── iceberg_metadata_queries.sql
-└── src/lakehouse/                 # Python modules
-    ├── __init__.py
-    ├── settings.py                # Configuration management
-    ├── spark_session.py           # Spark session builder
-    ├── bronze.py                  # Bronze layer logic
-    ├── silver.py                  # Silver layer logic
-    └── gold.py                    # Gold layer logic
+└── src/lakehouse/              # Python modules
+    ├── spark_session.py        # Spark session builder
+    ├── settings.py             # Configuration
+    ├── bronze.py               # Bronze layer logic
+    ├── silver.py               # Silver layer logic
+    └── gold.py                 # Gold layer logic
 ```
 
 ## Prerequisites
@@ -74,7 +63,6 @@ aws-iceberg-nessie-retail-lakehouse/
 ### Software Required
 - Python 3.11+
 - Java 11+ (for Spark)
-- Apache Spark 3.5.1 (managed via pyspark)
 - Docker Desktop (for Nessie)
 
 ### AWS Resources
@@ -105,7 +93,7 @@ WAREHOUSE=s3://your-bucket-name/
 ### 1. Start Nessie Catalog
 
 ```bash
-docker run -p 19120:19120 ghcr.io/projectnessie/nessie:latest
+docker run -d --name nessie -p 19120:19120 ghcr.io/projectnessie/nessie:latest
 ```
 
 Verify Nessie is running:
@@ -113,10 +101,14 @@ Verify Nessie is running:
 curl http://localhost:19120/api/v2/config
 ```
 
-### 2. Upload Source Data to S3
+### 2. Upload Data to S3
 
 ```bash
+# Upload the main file
 python scripts/upload_to_s3.py
+
+# Upload batch files for demo
+python scripts/upload_to_s3.py --batch-files
 ```
 
 ### 3. Run the Complete Pipeline
@@ -129,55 +121,101 @@ python scripts/run_full_pipeline.py
 python scripts/run_full_pipeline.py --drop-all
 ```
 
-### 4. Verify Results
+## Notebooks
 
+### Learning Path (01-04)
+
+| Notebook                          | Content                             |
+|-----------------------------------|-------------------------------------|
+| `01_setup_environment.ipynb`      | Spark session + Nessie namespaces   |
+| `02_ingestion_bronze.ipynb`       | CSV reading + Bronze table creation |
+| `03_silver_transformations.ipynb` | Standardization + quality filters   |
+| `04_gold_layer.ipynb`             | Business aggregations               |
+
+### Demo Notebooks (05-06)
+
+| Notebook                 | Content                                           |
+|--------------------------|---------------------------------------------------|
+| `05_nessie_demo.ipynb`   | Nessie features: time travel, branching, rollback |
+| `06_complete_demo.ipynb` | **Multi-batch demo for interviews**               |
+
+Run notebooks in VS Code or Jupyter Lab:
 ```bash
-# Check Bronze
-python -c "from lakehouse.spark_session import get_spark; spark = get_spark(); spark.sql('SELECT COUNT(*) FROM nessie.bronze.sales').show()"
-
-# Check Silver
-python -c "from lakehouse.spark_session import get_spark; spark = get_spark(); spark.sql('SELECT COUNT(*) FROM nessie.silver.sales').show()"
-
-# Check Gold
-python -c "from lakehouse.spark_session import get_spark; spark = get_spark(); spark.sql('SELECT * FROM nessie.gold.sales_by_category_region ORDER BY total_sales DESC').show()"
+jupyter lab
 ```
 
-## Multi-Batch Ingestion Demo
+## Layer Responsibilities
 
-### Generate Batch Files with Quality Issues
+| Layer      | Purpose             | Characteristics                                                       |
+|------------|---------------------|-----------------------------------------------------------------------|
+| **Bronze** | Raw data landing    | Append-only, partitioned by `ingestion_date`, preserves source format |
+| **Silver** | Standardization     | Column renaming, quality filters, deduplication, type casting         |
+| **Gold**   | Business aggregates | Pre-computed metrics, rounded values, reporting-ready                 |
+
+## CI/CD
+
+GitHub Actions:
+- Validates project structure
+- Validates Python syntax
+- Validates notebook JSON
+- **Uploads data to S3 on every push to main branch**
+
+### Required GitHub Secrets
+
+| Secret                  | Description                    |
+|-------------------------|--------------------------------|
+| `AWS_ACCESS_KEY_ID`     | AWS access key                 |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key                 |
+| `AWS_REGION`            | AWS region (e.g., `eu-west-3`) |
+| `AWS_BUCKET`            | S3 bucket name                 |
+
+## Interview Demo Guide
+
+### Demo Setup (5 minutes)
 
 ```bash
-# Generate 3 batch files with ~5% data quality issues
-python scripts/generate_batch_data.py --num-batches 3
+# 1. Start Nessie
+docker run -p 19120:19120 ghcr.io/projectnessie/nessie:latest
+
+# 2. Upload batch data to S3
+python scripts/upload_to_s3.py --batch-files
 ```
 
-This creates files with intentional issues:
-- Null sales values
-- Null product IDs
-- Invalid discounts (> 1 or < 0)
-- Invalid quantities (<= 0)
-- Duplicate records
+### Demo Flow (15-20 minutes)
 
-### Ingest Multiple Batches
+#### Option 1: Use the Complete Demo Notebook (Recommended)
+
+Open `notebooks/06_complete_demo.ipynb` and run all cells. This demonstrates:
+
+1. **Batch 1 (Morning)**: Initial ingestion, Bronze → Silver → Gold
+2. **Batch 2 (Noon)**: Append new data, update all layers
+3. **Batch 3 (Afternoon)**: Final append, complete dataset
+4. **Time Travel**: Query data at different points in time
+5. **Branching**: Create a dev branch for safe experimentation
+6. **Rollback**: Demonstrate reverting to previous state
+
+#### Option 2: Manual Step-by-Step
 
 ```bash
-# Process all batch files
-python scripts/ingest_multi_batch.py --drop-first
+# Step 1: Run initial pipeline
+python scripts/run_full_pipeline.py --drop-all
+
+# Step 2: Run Nessie demo notebook
+jupyter lab notebooks/05_nessie_demo.ipynb
 ```
 
-## Available Scripts
+### Key Talking Points
 
-| Script                    | Purpose                    | Key Options                     |
-|---------------------------|----------------------------|---------------------------------|
-| `run_full_pipeline.py`    | Run Bronze → Silver → Gold | `--drop-all`, `--append-bronze` |
-| `create_bronze_tables.py` | Bronze layer only          | `--append`, `--drop-first`      |
-| `create_silver_tables.py` | Silver layer only          | `--drop-first`                  |
-| `create_gold_tables.py`   | Gold layer only            | `--drop-first`                  |
-| `ingest_multi_batch.py`   | Multi-batch ingestion      | `--s3-mode`, `--drop-first`     |
-| `generate_batch_data.py`  | Generate test batches      | `--num-batches`, `--issue-rate` |
-| `upload_to_s3.py`         | Upload data to S3          | -                               |
+| Feature                    | Benefit                         | Demo Command                               |
+|----------------------------|---------------------------------|--------------------------------------------|
+| **Medallion Architecture** | Clear separation of concerns    | `show tables in nessie.bronze/silver/gold` |
+| **Data Quality**           | Automatic filtering of bad data | Quality check output in pipeline           |
+| **Time Travel**            | Query any historical version    | `VERSION AS OF 'snapshot_id'`              |
+| **Branching**              | Safe experimentation            | Nessie API calls                           |
+| **ACID Transactions**      | Reliable data updates           | Show snapshot history                      |
+| **S3 Storage**             | Decoupled compute and storage   | `s3a://` paths                             |
 
-## Iceberg & Nessie Features
+## Nessie & Iceberg Features
 
 ### Time Travel
 
@@ -205,63 +243,11 @@ SELECT * FROM nessie.bronze.sales.snapshots
 
 ```bash
 # Create a new branch
-curl -X POST http://localhost:19120/api/v2/trees/branch -d '{"name": "dev", "source": "main"}'
+curl -X POST http://localhost:19120/api/v2/trees -d '{"name": "dev", "source": "main"}'
 
 # List branches
 curl http://localhost:19120/api/v2/trees
 ```
-
-## Data Flow Details
-
-### Bronze Layer (nessie.bronze.sales)
-- **Source**: Raw CSV from S3
-- **Schema**: Same as source (PascalCase columns)
-- **Added columns**: `ingestion_date`, `ingestion_ts`, `source_file`, `source_system`, `batch_id`
-- **Partitioning**: By `ingestion_date`
-- **Mode**: Append-only
-
-### Silver Layer (nessie.silver.sales)
-- **Source**: Bronze layer
-- **Transformations**:
-  - Column renaming: `Order ID` → `order_id`, etc.
-  - Type casting: `Sales` → `double`, `Quantity` → `int`
-  - Text trimming on string columns
-  - Null filtering on: `order_id`, `product_id`, `sales`
-  - Deduplication on: `order_id` + `product_id`
-
-### Gold Layer (nessie.gold.sales_by_category_region)
-- **Source**: Silver layer
-- **Aggregation**: By `category` and `region`
-- **Metrics**:
-  - `total_sales`: Sum of sales (rounded)
-  - `total_profit`: Sum of profit (rounded)
-  - `total_quantity`: Sum of quantity
-  - `order_count`: Count of orders
-
-## Development with Notebooks
-
-The notebooks demonstrate each layer step-by-step:
-
-1. **01_setup_environment.ipynb**: Spark session + Nessie namespaces
-2. **02_ingestion_bronze.ipynb**: CSV reading + Bronze table creation
-3. **03_silver_transformations.ipynb**: Standardization + quality filters
-4. **04_gold_layer.ipynb**: Business aggregations
-
-Run notebooks in VS Code or Jupyter Lab:
-
-```bash
-jupyter lab
-```
-
-## CI/CD
-
-GitHub Actions validates:
-- Project structure
-- Python syntax
-- Notebook JSON validity
-- Requirements file
-
-View status: Actions tab in GitHub
 
 ## Troubleshooting
 
@@ -285,35 +271,6 @@ docker restart <container-id>
 export PYSPARK_DRIVER_MEMORY=4g
 ```
 
-### Hadoop on Windows
-Ensure `HADOOP_HOME` is set in `spark_session.py`:
-```python
-os.environ["HADOOP_HOME"] = r"C:\hadoop"
-```
-
-## Key Technical Decisions
-
-1. **Why Iceberg?** ACID transactions, time travel, schema evolution
-2. **Why Nessie?** Git-like versioning for data, branch-based development
-3. **Why S3?** Scalable object storage, decoupled storage/compute
-4. **Why Bronze/Silver/Gold?** Clear separation of concerns, quality boundaries
-5. **Why Python + PySpark?** Industry standard, rich ecosystem
-
-## Future Enhancements
-
-- [ ] DBT integration for transformations
-- [ ] Airflow/Prefect orchestration
-- [ ] Data quality with Great Expectations
-- [ ] Unit tests for transformations
-- [ ] CI/CD with Nessie branch promotion
-- [ ] Monitoring and observability
-
 ## License
 
 MIT License - feel free to use this project for learning and demonstration.
-
-## References
-
-- [Apache Iceberg Documentation](https://iceberg.apache.org/)
-- [Project Nessie Documentation](https://projectnessie.org/)
-- [AWS S3 Documentation](https://docs.aws.amazon.com/s3/)
