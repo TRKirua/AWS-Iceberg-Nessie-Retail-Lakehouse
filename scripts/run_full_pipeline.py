@@ -3,23 +3,20 @@
 Full pipeline orchestration script.
 
 This script runs the complete Bronze -> Silver -> Gold pipeline.
-It's designed to be the main entry point for batch processing.
+It processes batch files from S3 and creates the full medallion architecture.
 
 Usage:
-    python scripts/run_full_pipeline.py [options]
-
-Examples:
-    # Run full pipeline with defaults
+    # Run full pipeline with all 3 batches
     python scripts/run_full_pipeline.py
 
-    # Run with specific source file
-    python scripts/run_full_pipeline.py --source-file sales_batch_1.csv
+    # Run with specific batches
+    python scripts/run_full_pipeline.py --batches 1 2
+
+    # Run single batch
+    python scripts/run_full_pipeline.py --batch 3
 
     # Run and drop all tables first
     python scripts/run_full_pipeline.py --drop-all
-
-    # Append to existing Bronze instead of recreating
-    python scripts/run_full_pipeline.py --append-bronze
 """
 
 import argparse
@@ -69,34 +66,39 @@ def setup_namespaces(spark: SparkSession) -> None:
 
 def run_bronze(
     spark: SparkSession,
-    source_file: str = "superstore_sales.csv",
-    batch_id: str = "batch_001",
-    append: bool = False,
+    batch_number: int = 1,
     drop_first: bool = False,
 ) -> int:
     """
-    Run Bronze layer ingestion.
+    Run Bronze layer ingestion for a specific batch.
+
+    Args:
+        spark: Spark session
+        batch_number: Batch number (1, 2, or 3)
+        drop_first: Drop table before ingestion
 
     Returns:
         Number of records in Bronze table after ingestion
     """
     print("=" * 60)
-    print("STEP 1: Bronze Layer - Raw Data Ingestion")
+    print(f"STEP 1: Bronze Layer - Batch {batch_number} Ingestion")
     print("=" * 60)
 
-    s3_path = f"s3a://{AWS_BUCKET}/raw/sales/{source_file}"
+    # Construct batch file path
+    batch_file = f"sales_batch_{batch_number:03d}.csv"
+    s3_path = f"s3a://{AWS_BUCKET}/raw/batches/{batch_file}"
     print(f"Source: {s3_path}")
 
     # Read and enrich
-    sales_raw = read_sales_csv(spark, s3_path, source_file)
+    sales_raw = read_sales_csv(spark, s3_path, batch_file)
     raw_count = sales_raw.count()
     print(f"Raw records read: {raw_count:,}")
 
     sales_bronze = enrich_with_metadata(
         sales_raw,
-        source_file=source_file,
-        source_system="superstore_csv",
-        batch_id=batch_id,
+        source_file=batch_file,
+        source_system="sales_system",
+        batch_id=f"batch_{batch_number}",
     )
 
     # Drop if requested
@@ -105,7 +107,7 @@ def run_bronze(
         drop_bronze_table(spark, "nessie.bronze.sales")
 
     # Write
-    if append:
+    if batch_number > 1:
         print("Appending to nessie.bronze.sales...")
         append_to_bronze(sales_bronze, "nessie.bronze.sales")
     else:
@@ -205,13 +207,15 @@ def run_gold(spark: SparkSession, drop_first: bool = False) -> int:
 
 
 def run_pipeline(
-    source_file: str = "superstore_sales.csv",
-    batch_id: str = "batch_001",
+    batch_numbers: list[int] = [1, 2, 3],
     drop_all: bool = False,
-    append_bronze: bool = False,
 ) -> dict:
     """
-    Run the complete Bronze -> Silver -> Gold pipeline.
+    Run the complete Bronze -> Silver -> Gold pipeline for multiple batches.
+
+    Args:
+        batch_numbers: List of batch numbers to process (default: [1, 2, 3])
+        drop_all: Drop all tables before running pipeline
 
     Returns:
         Dictionary with pipeline statistics
@@ -222,34 +226,41 @@ def run_pipeline(
         # Setup
         setup_namespaces(spark)
 
-        # Bronze
-        bronze_count = run_bronze(
-            spark,
-            source_file=source_file,
-            batch_id=batch_id,
-            append=append_bronze,
-            drop_first=drop_all,
-        )
+        # Process each batch
+        for i, batch_num in enumerate(batch_numbers):
+            print(f"\n{'='*60}")
+            print(f"PROCESSING BATCH {batch_num} ({i+1}/{len(batch_numbers)})")
+            print(f"{'='*60}\n")
 
-        # Silver
+            run_bronze(
+                spark,
+                batch_number=batch_num,
+                drop_first=(batch_num == 1 and drop_all),
+            )
+
+        # Silver (process all Bronze data)
         silver_count = run_silver(spark, drop_first=drop_all)
 
-        # Gold
+        # Gold (recalculate from all Silver data)
         gold_count = run_gold(spark, drop_first=drop_all)
 
         # Summary
+        final_bronze_count = spark.sql("SELECT COUNT(*) FROM nessie.bronze.sales").first()[0]
         print("=" * 60)
         print("PIPELINE SUMMARY")
         print("=" * 60)
-        print(f"Bronze records: {bronze_count:,}")
+        print(f"Batches processed: {batch_numbers}")
+        print(f"Bronze records: {final_bronze_count:,}")
         print(f"Silver records: {silver_count:,}")
         print(f"Gold records:   {gold_count:,}")
-        print(f"Quality filter rate: {(1 - silver_count/bronze_count)*100:.2f}%")
+        if final_bronze_count > 0:
+            print(f"Quality filter rate: {(1 - silver_count/final_bronze_count)*100:.2f}%")
         print("=" * 60)
         print("Pipeline completed successfully!")
 
         return {
-            "bronze": bronze_count,
+            "batches": batch_numbers,
+            "bronze": final_bronze_count,
             "silver": silver_count,
             "gold": gold_count,
         }
@@ -267,33 +278,35 @@ def main():
         description="Run the complete Bronze -> Silver -> Gold pipeline"
     )
     parser.add_argument(
-        "--source-file",
-        default="superstore_sales.csv",
-        help="Source CSV filename (default: superstore_sales.csv)",
+        "--batches",
+        type=int,
+        nargs="+",
+        default=[1, 2, 3],
+        help="Batch numbers to process (default: 1 2 3)",
     )
     parser.add_argument(
-        "--batch-id",
-        default="batch_001",
-        help="Batch identifier (default: batch_001)",
+        "--batch",
+        type=int,
+        default=None,
+        help="Single batch number to process (e.g., --batch 1)",
     )
     parser.add_argument(
         "--drop-all",
         action="store_true",
         help="Drop all tables before running pipeline",
     )
-    parser.add_argument(
-        "--append-bronze",
-        action="store_true",
-        help="Append to Bronze instead of creating new",
-    )
 
     args = parser.parse_args()
 
+    # Determine which batches to process
+    if args.batch is not None:
+        batch_numbers = [args.batch]
+    else:
+        batch_numbers = args.batches
+
     run_pipeline(
-        source_file=args.source_file,
-        batch_id=args.batch_id,
+        batch_numbers=batch_numbers,
         drop_all=args.drop_all,
-        append_bronze=args.append_bronze,
     )
 
 

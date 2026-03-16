@@ -128,7 +128,7 @@ def generate_batches(
         # Introduce quality issues
         batch_df = introduce_quality_issues(batch_df, issue_rate)
 
-        # Write batch file
+        # Write batch file (format: sales_batch_001.csv, sales_batch_002.csv, etc.)
         batch_filename = f"sales_batch_{i+1:03d}.csv"
         batch_path = output_dir / batch_filename
         batch_df.to_csv(batch_path, index=False, quoting=1)

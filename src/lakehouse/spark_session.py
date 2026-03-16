@@ -6,6 +6,7 @@ from lakehouse.settings import (
     AWS_ACCESS_KEY_ID,
     AWS_SECRET_ACCESS_KEY,
     NESSIE_URI,
+    NESSIE_BRANCH,
     WAREHOUSE,
 )
 
@@ -42,6 +43,7 @@ def get_spark(app_name: str = "aws-iceberg-nessie-retail-lakehouse") -> SparkSes
         .config("spark.sql.catalog.nessie", "org.apache.iceberg.spark.SparkCatalog")
         .config("spark.sql.catalog.nessie.catalog-impl", "org.apache.iceberg.nessie.NessieCatalog")
         .config("spark.sql.catalog.nessie.uri", NESSIE_URI)
+        .config("spark.sql.catalog.nessie.ref", NESSIE_BRANCH)
         .config("spark.sql.catalog.nessie.warehouse", WAREHOUSE)
         .config("spark.sql.catalog.nessie.authentication.type", "NONE")
         .config("spark.sql.catalog.nessie.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")

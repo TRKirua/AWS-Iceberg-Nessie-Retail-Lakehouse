@@ -5,14 +5,14 @@ Upload data files to AWS S3.
 This script uploads local CSV files to S3 for processing by the lakehouse pipeline.
 
 Usage:
-    # Upload the main source file
-    python scripts/upload_to_s3.py
-
-    # Upload batch files
+    # Upload batch files (default for this project)
     python scripts/upload_to_s3.py --batch-files
 
     # Upload everything
     python scripts/upload_to_s3.py --all
+
+    # List files currently in S3
+    python scripts/upload_to_s3.py --list
 """
 
 import os
@@ -62,15 +62,15 @@ def upload_file(s3_client, local_path: str, s3_key: str) -> bool:
     local_file = Path(local_path)
 
     if not local_file.exists():
-        print(f"  ⚠ File not found: {local_path}")
+        print(f"File not found: {local_path}")
         return False
 
     try:
-        print(f"  📤 {local_file.name} -> s3://{AWS_BUCKET}/{s3_key}")
+        print(f"{local_file.name} -> s3://{AWS_BUCKET}/{s3_key}")
         s3_client.upload_file(str(local_file), AWS_BUCKET, s3_key)
         return True
     except Exception as e:
-        print(f"  ❌ Upload failed: {e}")
+        print(f"Upload failed: {e}")
         return False
 
 
@@ -112,7 +112,7 @@ def upload_source_files(s3_client, upload_main: bool = True, upload_batches: boo
             success_count += 1
 
     print("-" * 60)
-    print(f"✅ Upload complete: {success_count}/{len(uploads)} files uploaded")
+    print(f"Upload complete: {success_count}/{len(uploads)} files uploaded")
 
 
 def list_s3_files(s3_client, prefix: str = ""):
@@ -123,7 +123,7 @@ def list_s3_files(s3_client, prefix: str = ""):
         s3_client: Boto3 S3 client
         prefix: S3 prefix to filter
     """
-    print(f"\nFiles in s3://{AWS_BUCKET}/{prefix or '*'}:")
+    print(f"Files in s3://{AWS_BUCKET}/{prefix or '*'}:")
     print("-" * 60)
 
     paginator = s3_client.get_paginator("list_objects_v2")
@@ -162,12 +162,6 @@ def main():
         action="store_true",
         help="List files currently in S3"
     )
-    parser.add_argument(
-        "--skip-main",
-        action="store_true",
-        help="Skip uploading main source file"
-    )
-
     args = parser.parse_args()
 
     # Create S3 session
@@ -179,12 +173,15 @@ def main():
         return 0
 
     # Determine what to upload
-    upload_main = not args.skip_main
+    upload_main = args.all
     upload_batches = args.batch_files or args.all
 
     if not upload_main and not upload_batches:
-        # Default: upload main file only
-        upload_main = True
+        print("No files specified for upload.")
+        print("Use --batch-files to upload batch files or --all to upload everything.")
+        print("Use --list to see files currently in S3.")
+        parser.print_help()
+        return 1
 
     # Upload files
     upload_source_files(s3, upload_main, upload_batches)
