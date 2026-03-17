@@ -161,7 +161,7 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION || 'eu-west-3' }}
           AWS_BUCKET: ${{ secrets.AWS_BUCKET }}
         run: |
-          python scripts/upload_to_s3.py
+          python scripts/upload_to_s3.py --all
 
       - name: Upload batch data to S3
         env:

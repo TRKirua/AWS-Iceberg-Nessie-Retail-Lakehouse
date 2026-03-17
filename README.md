@@ -10,17 +10,17 @@ A professional data lakehouse demonstration using:
 ## Architecture Overview
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                      DATA LAKEHOUSE                      │
-├──────────────────────────────────────────────────────────┤
-│                                                          │
-│   S3 Files ──► Bronze ──► Silver ──► Gold                │
-│               (Iceberg)  (Iceberg) (Iceberg)             │
-│                   │          │         │                 │
-│                   ▼          ▼         ▼                 │
-│                 Nessie Catalog (Versioned)               │
-│                                                          │
-└──────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────┐
+│                      DATA LAKEHOUSE                │
+├────────────────────────────────────────────────────┤
+│                                                    │
+│   S3 Files ──► Bronze ──► Silver ──► Gold          │
+│               (Iceberg)  (Iceberg) (Iceberg)       │
+│                   │          │         │           │
+│                   ▼          ▼         ▼           │
+│                 Nessie Catalog (Versioned)         │
+│                                                    │
+└────────────────────────────────────────────────────┘
 ```
 
 ## Project Structure
